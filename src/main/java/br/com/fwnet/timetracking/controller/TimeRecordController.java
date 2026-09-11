@@ -1,0 +1,38 @@
+package br.com.fwnet.timetracking.controller;
+
+import br.com.fwnet.timetracking.dto.request.CreateTimeRecordRequest;
+import br.com.fwnet.timetracking.dto.response.TimeRecordResponse;
+import br.com.fwnet.timetracking.service.TimeRecordService;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.security.Principal;
+
+@RestController
+@RequestMapping("/time-records")
+public class TimeRecordController {
+
+    private final TimeRecordService timeRecordService;
+
+    public TimeRecordController(TimeRecordService timeRecordService) {
+        this.timeRecordService = timeRecordService;
+    }
+
+    @PostMapping
+    public ResponseEntity<TimeRecordResponse> create(
+            Principal principal,
+            @Valid @RequestBody CreateTimeRecordRequest request
+    ) {
+        TimeRecordResponse response =
+                timeRecordService.create(principal.getName(), request);
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(response);
+    }
+}
