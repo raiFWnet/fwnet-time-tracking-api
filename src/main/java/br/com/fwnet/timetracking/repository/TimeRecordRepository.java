@@ -22,4 +22,6 @@ public interface TimeRecordRepository extends JpaRepository<TimeRecord, UUID> {
     );
 
     List<TimeRecord> findByUserIdOrderByRecordedAtDesc(UUID userId);
+
+    List<TimeRecord> findAllByOrderByRecordedAtDesc();
 }
