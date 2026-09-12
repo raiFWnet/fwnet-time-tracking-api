@@ -40,10 +40,15 @@ public class TimeRecordService {
     }
 
     @Transactional
-    public TimeRecordResponse create(String authenticatedEmail, CreateTimeRecordRequest request) {
+    public TimeRecordResponse create(
+            String authenticatedEmail,
+            CreateTimeRecordRequest request
+    ) {
         User user = userRepository.findByEmail(authenticatedEmail)
                 .orElseThrow(() ->
-                        new UserNotFoundException("Usuário autenticado não encontrado.")
+                        new UserNotFoundException(
+                                "Usuário autenticado não encontrado."
+                        )
                 );
 
         if (!user.isActive()) {
@@ -83,16 +88,36 @@ public class TimeRecordService {
         timeRecord.setSource(WEB_SOURCE);
         timeRecord.setCreatedAt(now);
 
-        TimeRecord savedTimeRecord = timeRecordRepository.save(timeRecord);
+        TimeRecord savedTimeRecord =
+                timeRecordRepository.save(timeRecord);
 
         return timeRecordMapper.toResponse(savedTimeRecord);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TimeRecordResponse> getHistory(
+            String authenticatedEmail
+    ) {
+        User user = userRepository.findByEmail(authenticatedEmail)
+                .orElseThrow(() ->
+                        new UserNotFoundException(
+                                "Usuário autenticado não encontrado."
+                        )
+                );
+
+        return timeRecordRepository
+                .findByUserIdOrderByRecordedAtDesc(user.getId())
+                .stream()
+                .map(timeRecordMapper::toResponse)
+                .toList();
     }
 
     private void validateSequence(
             List<TimeRecord> currentRecords,
             TimeRecordType requestedType
     ) {
-        TimeRecordType expectedType = determineExpectedType(currentRecords);
+        TimeRecordType expectedType =
+                determineExpectedType(currentRecords);
 
         if (expectedType == null) {
             throw new InvalidTimeRecordSequenceException(
@@ -108,13 +133,17 @@ public class TimeRecordService {
         }
     }
 
-    private TimeRecordType determineExpectedType(List<TimeRecord> currentRecords) {
+    private TimeRecordType determineExpectedType(
+            List<TimeRecord> currentRecords
+    ) {
         if (currentRecords.isEmpty()) {
             return TimeRecordType.CLOCK_IN;
         }
 
         TimeRecordType lastRecordType =
-                currentRecords.get(currentRecords.size() - 1).getRecordType();
+                currentRecords
+                        .get(currentRecords.size() - 1)
+                        .getRecordType();
 
         return switch (lastRecordType) {
             case CLOCK_IN -> TimeRecordType.LUNCH_OUT;
