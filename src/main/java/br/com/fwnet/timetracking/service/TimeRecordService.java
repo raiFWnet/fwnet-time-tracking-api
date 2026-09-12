@@ -1,6 +1,7 @@
 package br.com.fwnet.timetracking.service;
 
 import br.com.fwnet.timetracking.dto.request.CreateTimeRecordRequest;
+import br.com.fwnet.timetracking.dto.response.AdminTimeRecordResponse;
 import br.com.fwnet.timetracking.dto.response.TimeRecordResponse;
 import br.com.fwnet.timetracking.entity.TimeRecord;
 import br.com.fwnet.timetracking.entity.User;
@@ -109,6 +110,15 @@ public class TimeRecordService {
                 .findByUserIdOrderByRecordedAtDesc(user.getId())
                 .stream()
                 .map(timeRecordMapper::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<AdminTimeRecordResponse> getAdminHistory() {
+        return timeRecordRepository
+                .findAllByOrderByRecordedAtDesc()
+                .stream()
+                .map(timeRecordMapper::toAdminResponse)
                 .toList();
     }
 

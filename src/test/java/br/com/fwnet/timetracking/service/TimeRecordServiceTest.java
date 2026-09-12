@@ -1,6 +1,7 @@
 package br.com.fwnet.timetracking.service;
 
 import br.com.fwnet.timetracking.dto.request.CreateTimeRecordRequest;
+import br.com.fwnet.timetracking.dto.response.AdminTimeRecordResponse;
 import br.com.fwnet.timetracking.dto.response.TimeRecordResponse;
 import br.com.fwnet.timetracking.entity.TimeRecord;
 import br.com.fwnet.timetracking.entity.User;
@@ -530,10 +531,83 @@ class TimeRecordServiceTest {
         );
     }
 
+    @Test
+    void shouldReturnAllTimeRecordsForAdminHistory() {
+        User firstUser = createUser(
+                "Maria Teste",
+                "maria.teste@fwnet.com.br"
+        );
+
+        User secondUser = createUser(
+                "João da Silva",
+                "joao.teste@fwnet.com.br"
+        );
+
+        TimeRecord firstRecord = createTimeRecord(
+                firstUser,
+                TimeRecordType.CLOCK_OUT,
+                1
+        );
+
+        TimeRecord secondRecord = createTimeRecord(
+                secondUser,
+                TimeRecordType.CLOCK_IN,
+                3
+        );
+
+        AdminTimeRecordResponse firstResponse =
+                createExpectedAdminResponse(
+                        firstRecord,
+                        firstUser
+                );
+
+        AdminTimeRecordResponse secondResponse =
+                createExpectedAdminResponse(
+                        secondRecord,
+                        secondUser
+                );
+
+        when(timeRecordRepository.findAllByOrderByRecordedAtDesc())
+                .thenReturn(List.of(firstRecord, secondRecord));
+
+        when(timeRecordMapper.toAdminResponse(firstRecord))
+                .thenReturn(firstResponse);
+
+        when(timeRecordMapper.toAdminResponse(secondRecord))
+                .thenReturn(secondResponse);
+
+        List<AdminTimeRecordResponse> history =
+                timeRecordService.getAdminHistory();
+
+        assertEquals(2, history.size());
+        assertEquals(firstResponse, history.get(0));
+        assertEquals(secondResponse, history.get(1));
+
+        verify(timeRecordRepository)
+                .findAllByOrderByRecordedAtDesc();
+
+        verify(timeRecordMapper)
+                .toAdminResponse(firstRecord);
+
+        verify(timeRecordMapper)
+                .toAdminResponse(secondRecord);
+    }
+
     private User createActiveUser() {
+        return createUser(
+                "Analyst Test",
+                EMAIL
+        );
+    }
+
+    private User createUser(
+            String fullName,
+            String email
+    ) {
         User user = new User();
         user.setId(UUID.randomUUID());
-        user.setEmail(EMAIL);
+        user.setFullName(fullName);
+        user.setEmail(email);
         user.setActive(true);
 
         return user;
@@ -571,6 +645,23 @@ class TimeRecordServiceTest {
                 now,
                 "WEB",
                 now
+        );
+    }
+
+    private AdminTimeRecordResponse createExpectedAdminResponse(
+            TimeRecord timeRecord,
+            User user
+    ) {
+        return new AdminTimeRecordResponse(
+                timeRecord.getId(),
+                user.getId(),
+                user.getFullName(),
+                user.getEmail(),
+                timeRecord.getWorkDate(),
+                timeRecord.getRecordType(),
+                timeRecord.getRecordedAt(),
+                timeRecord.getSource(),
+                timeRecord.getCreatedAt()
         );
     }
 }
