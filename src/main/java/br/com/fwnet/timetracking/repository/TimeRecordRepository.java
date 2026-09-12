@@ -20,4 +20,6 @@ public interface TimeRecordRepository extends JpaRepository<TimeRecord, UUID> {
             LocalDate workDate,
             TimeRecordType recordType
     );
+
+    List<TimeRecord> findByUserIdOrderByRecordedAtDesc(UUID userId);
 }

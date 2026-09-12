@@ -463,6 +463,73 @@ class TimeRecordServiceTest {
         );
     }
 
+    @Test
+    void shouldReturnHistoryForAuthenticatedUser() {
+        User user = createActiveUser();
+
+        TimeRecord clockOut = createTimeRecord(
+                user,
+                TimeRecordType.CLOCK_OUT,
+                1
+        );
+
+        TimeRecord lunchIn = createTimeRecord(
+                user,
+                TimeRecordType.LUNCH_IN,
+                4
+        );
+
+        TimeRecordResponse clockOutResponse =
+                createExpectedResponse(TimeRecordType.CLOCK_OUT);
+
+        TimeRecordResponse lunchInResponse =
+                createExpectedResponse(TimeRecordType.LUNCH_IN);
+
+        when(userRepository.findByEmail(EMAIL))
+                .thenReturn(Optional.of(user));
+
+        when(timeRecordRepository.findByUserIdOrderByRecordedAtDesc(
+                user.getId()
+        )).thenReturn(List.of(clockOut, lunchIn));
+
+        when(timeRecordMapper.toResponse(clockOut))
+                .thenReturn(clockOutResponse);
+
+        when(timeRecordMapper.toResponse(lunchIn))
+                .thenReturn(lunchInResponse);
+
+        List<TimeRecordResponse> history =
+                timeRecordService.getHistory(EMAIL);
+
+        assertEquals(2, history.size());
+        assertEquals(clockOutResponse, history.get(0));
+        assertEquals(lunchInResponse, history.get(1));
+
+        verify(timeRecordRepository)
+                .findByUserIdOrderByRecordedAtDesc(user.getId());
+    }
+
+    @Test
+    void shouldRejectHistoryWhenAuthenticatedUserIsNotFound() {
+        when(userRepository.findByEmail(EMAIL))
+                .thenReturn(Optional.empty());
+
+        UserNotFoundException exception = assertThrows(
+                UserNotFoundException.class,
+                () -> timeRecordService.getHistory(EMAIL)
+        );
+
+        assertEquals(
+                "Usuário autenticado não encontrado.",
+                exception.getMessage()
+        );
+
+        verifyNoInteractions(
+                timeRecordRepository,
+                timeRecordMapper
+        );
+    }
+
     private User createActiveUser() {
         User user = new User();
         user.setId(UUID.randomUUID());
