@@ -4,6 +4,7 @@ import br.com.fwnet.timetracking.dto.request.CreateTimeRecordRequest;
 import br.com.fwnet.timetracking.dto.response.AdminTimeRecordResponse;
 import br.com.fwnet.timetracking.dto.response.TimeRecordResponse;
 import br.com.fwnet.timetracking.service.TimeRecordService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +19,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/time-records")
+@SecurityRequirement(name = "bearerAuth")
 public class TimeRecordController {
 
     private final TimeRecordService timeRecordService;
