@@ -3,6 +3,7 @@ package br.com.fwnet.timetracking.controller;
 import br.com.fwnet.timetracking.dto.request.CreateUserRequest;
 import br.com.fwnet.timetracking.dto.response.UserResponse;
 import br.com.fwnet.timetracking.service.UserService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/users")
+@SecurityRequirement(name = "bearerAuth")
 public class UserController {
 
     private final UserService userService;
