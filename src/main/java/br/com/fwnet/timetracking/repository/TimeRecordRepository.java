@@ -21,6 +21,13 @@ public interface TimeRecordRepository extends JpaRepository<TimeRecord, UUID> {
             TimeRecordType recordType
     );
 
+    boolean existsByUserIdAndWorkDateAndRecordTypeAndIdNot(
+            UUID userId,
+            LocalDate workDate,
+            TimeRecordType recordType,
+            UUID id
+    );
+
     List<TimeRecord> findByUserIdOrderByRecordedAtDesc(UUID userId);
 
     List<TimeRecord> findAllByOrderByRecordedAtDesc();

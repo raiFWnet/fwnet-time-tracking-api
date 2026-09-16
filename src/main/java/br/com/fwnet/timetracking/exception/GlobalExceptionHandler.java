@@ -3,6 +3,7 @@ package br.com.fwnet.timetracking.exception;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -84,6 +85,47 @@ public class GlobalExceptionHandler {
         );
 
         problemDetail.setTitle("Usuário inativo");
+        problemDetail.setProperty("path", request.getRequestURI());
+
+        return problemDetail;
+    }
+
+    @ExceptionHandler(TimeRecordNotFoundException.class)
+    public ProblemDetail handleTimeRecordNotFound(
+            TimeRecordNotFoundException exception,
+            HttpServletRequest request
+    ) {
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.NOT_FOUND,
+                exception.getMessage()
+        );
+
+        problemDetail.setTitle("Marcação não encontrada");
+        problemDetail.setProperty("path", request.getRequestURI());
+
+        return problemDetail;
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ProblemDetail handleMethodArgumentNotValid(
+            MethodArgumentNotValidException exception,
+            HttpServletRequest request
+    ) {
+        String detail = exception.getBindingResult()
+                .getFieldErrors()
+                .stream()
+                .findFirst()
+                .map(error ->
+                        error.getField() + ": " + error.getDefaultMessage()
+                )
+                .orElse("Dados da requisição inválidos.");
+
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST,
+                detail
+        );
+
+        problemDetail.setTitle("Dados inválidos");
         problemDetail.setProperty("path", request.getRequestURI());
 
         return problemDetail;

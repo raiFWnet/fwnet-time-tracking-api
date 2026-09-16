@@ -54,7 +54,7 @@ public class SecurityConfig {
                                 "/swagger-ui/**"
                         ).permitAll()
                         .requestMatchers("/users/**").hasRole("ADMIN")
-                        .requestMatchers("/time-records/admin").hasRole("ADMIN")
+                        .requestMatchers("/time-records/admin", "/time-records/admin/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/time-records").hasRole("ANALYST")
                         .requestMatchers(HttpMethod.POST, "/time-records").hasRole("ANALYST")
                         .anyRequest().authenticated()
