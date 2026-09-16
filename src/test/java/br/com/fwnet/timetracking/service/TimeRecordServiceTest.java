@@ -1,16 +1,20 @@
 package br.com.fwnet.timetracking.service;
 
+import br.com.fwnet.timetracking.dto.request.CorrectTimeRecordRequest;
 import br.com.fwnet.timetracking.dto.request.CreateTimeRecordRequest;
 import br.com.fwnet.timetracking.dto.response.AdminTimeRecordResponse;
 import br.com.fwnet.timetracking.dto.response.TimeRecordResponse;
 import br.com.fwnet.timetracking.entity.TimeRecord;
+import br.com.fwnet.timetracking.entity.TimeRecordCorrection;
 import br.com.fwnet.timetracking.entity.User;
 import br.com.fwnet.timetracking.enums.TimeRecordType;
 import br.com.fwnet.timetracking.exception.DuplicateTimeRecordException;
 import br.com.fwnet.timetracking.exception.InactiveUserException;
 import br.com.fwnet.timetracking.exception.InvalidTimeRecordSequenceException;
+import br.com.fwnet.timetracking.exception.TimeRecordNotFoundException;
 import br.com.fwnet.timetracking.exception.UserNotFoundException;
 import br.com.fwnet.timetracking.mapper.TimeRecordMapper;
+import br.com.fwnet.timetracking.repository.TimeRecordCorrectionRepository;
 import br.com.fwnet.timetracking.repository.TimeRecordRepository;
 import br.com.fwnet.timetracking.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,6 +49,9 @@ class TimeRecordServiceTest {
     private TimeRecordRepository timeRecordRepository;
 
     @Mock
+    private TimeRecordCorrectionRepository timeRecordCorrectionRepository;
+
+    @Mock
     private UserRepository userRepository;
 
     @Mock
@@ -56,11 +63,11 @@ class TimeRecordServiceTest {
     void setUp() {
         timeRecordService = new TimeRecordService(
                 timeRecordRepository,
+                timeRecordCorrectionRepository,
                 userRepository,
                 timeRecordMapper
         );
     }
-
     @Test
     void shouldCreateClockInWhenUserHasNoRecordsForTheDay() {
         User user = createActiveUser();
@@ -592,7 +599,290 @@ class TimeRecordServiceTest {
         verify(timeRecordMapper)
                 .toAdminResponse(secondRecord);
     }
+    @Test
+    void shouldCorrectTimeRecordAndCreateAudit() {
+        String adminEmail = "admin@fwnet.com.br";
 
+        User admin = createUser(
+                "Admin Test",
+                adminEmail
+        );
+
+        User analyst = createUser(
+                "Analyst Test",
+                EMAIL
+        );
+
+        TimeRecord timeRecord = createTimeRecord(
+                analyst,
+                TimeRecordType.CLOCK_IN,
+                2
+        );
+
+        LocalDate previousWorkDate =
+                timeRecord.getWorkDate();
+
+        OffsetDateTime previousRecordedAt =
+                timeRecord.getRecordedAt();
+
+        LocalDate newWorkDate =
+                previousWorkDate.minusDays(1);
+
+        OffsetDateTime newRecordedAt =
+                previousRecordedAt
+                        .minusDays(1)
+                        .plusMinutes(15);
+
+        CorrectTimeRecordRequest request =
+                new CorrectTimeRecordRequest(
+                        newWorkDate,
+                        newRecordedAt,
+                        "  Correção autorizada pelo administrador.  "
+                );
+
+        AdminTimeRecordResponse expectedResponse =
+                new AdminTimeRecordResponse(
+                        timeRecord.getId(),
+                        analyst.getId(),
+                        analyst.getFullName(),
+                        analyst.getEmail(),
+                        newWorkDate,
+                        TimeRecordType.CLOCK_IN,
+                        newRecordedAt,
+                        timeRecord.getSource(),
+                        timeRecord.getCreatedAt()
+                );
+
+        when(userRepository.findByEmail(adminEmail))
+                .thenReturn(Optional.of(admin));
+
+        when(timeRecordRepository.findById(timeRecord.getId()))
+                .thenReturn(Optional.of(timeRecord));
+
+        when(timeRecordRepository
+                .existsByUserIdAndWorkDateAndRecordTypeAndIdNot(
+                        analyst.getId(),
+                        newWorkDate,
+                        TimeRecordType.CLOCK_IN,
+                        timeRecord.getId()
+                )).thenReturn(false);
+
+        when(timeRecordRepository.save(any(TimeRecord.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        when(timeRecordMapper.toAdminResponse(any(TimeRecord.class)))
+                .thenReturn(expectedResponse);
+
+        AdminTimeRecordResponse response =
+                timeRecordService.correct(
+                        adminEmail,
+                        timeRecord.getId(),
+                        request
+                );
+
+        ArgumentCaptor<TimeRecord> timeRecordCaptor =
+                ArgumentCaptor.forClass(TimeRecord.class);
+
+        ArgumentCaptor<TimeRecordCorrection> correctionCaptor =
+                ArgumentCaptor.forClass(TimeRecordCorrection.class);
+
+        verify(timeRecordRepository)
+                .save(timeRecordCaptor.capture());
+
+        verify(timeRecordCorrectionRepository)
+                .save(correctionCaptor.capture());
+
+        TimeRecord savedTimeRecord =
+                timeRecordCaptor.getValue();
+
+        TimeRecordCorrection savedCorrection =
+                correctionCaptor.getValue();
+
+        assertEquals(timeRecord.getId(), savedTimeRecord.getId());
+        assertEquals(analyst, savedTimeRecord.getUser());
+        assertEquals(TimeRecordType.CLOCK_IN, savedTimeRecord.getRecordType());
+        assertEquals(newWorkDate, savedTimeRecord.getWorkDate());
+        assertEquals(newRecordedAt, savedTimeRecord.getRecordedAt());
+
+        assertNotNull(savedCorrection.getId());
+        assertEquals(savedTimeRecord, savedCorrection.getTimeRecord());
+        assertEquals(admin, savedCorrection.getCorrectedByUser());
+        assertEquals(
+                "Correção autorizada pelo administrador.",
+                savedCorrection.getReason()
+        );
+        assertEquals(
+                previousWorkDate,
+                savedCorrection.getPreviousWorkDate()
+        );
+        assertEquals(
+                newWorkDate,
+                savedCorrection.getNewWorkDate()
+        );
+        assertEquals(
+                previousRecordedAt,
+                savedCorrection.getPreviousRecordedAt()
+        );
+        assertEquals(
+                newRecordedAt,
+                savedCorrection.getNewRecordedAt()
+        );
+        assertNotNull(savedCorrection.getCreatedAt());
+
+        assertEquals(expectedResponse, response);
+    }
+
+    @Test
+    void shouldRejectCorrectionWhenTimeRecordIsNotFound() {
+        String adminEmail = "admin@fwnet.com.br";
+
+        User admin = createUser(
+                "Admin Test",
+                adminEmail
+        );
+
+        UUID timeRecordId = UUID.randomUUID();
+
+        CorrectTimeRecordRequest request =
+                new CorrectTimeRecordRequest(
+                        LocalDate.now(),
+                        OffsetDateTime.now(),
+                        "Correção administrativa."
+                );
+
+        when(userRepository.findByEmail(adminEmail))
+                .thenReturn(Optional.of(admin));
+
+        when(timeRecordRepository.findById(timeRecordId))
+                .thenReturn(Optional.empty());
+
+        TimeRecordNotFoundException exception = assertThrows(
+                TimeRecordNotFoundException.class,
+                () -> timeRecordService.correct(
+                        adminEmail,
+                        timeRecordId,
+                        request
+                )
+        );
+
+        assertEquals(
+                "Marcação de ponto não encontrada.",
+                exception.getMessage()
+        );
+
+        verify(timeRecordRepository, never())
+                .save(any(TimeRecord.class));
+
+        verifyNoInteractions(
+                timeRecordCorrectionRepository,
+                timeRecordMapper
+        );
+    }
+
+    @Test
+    void shouldRejectCorrectionWhenItCreatesDuplicateTimeRecord() {
+        String adminEmail = "admin@fwnet.com.br";
+
+        User admin = createUser(
+                "Admin Test",
+                adminEmail
+        );
+
+        User analyst = createUser(
+                "Analyst Test",
+                EMAIL
+        );
+
+        TimeRecord timeRecord = createTimeRecord(
+                analyst,
+                TimeRecordType.CLOCK_IN,
+                2
+        );
+
+        LocalDate newWorkDate =
+                timeRecord.getWorkDate().minusDays(1);
+
+        OffsetDateTime newRecordedAt =
+                timeRecord.getRecordedAt().minusDays(1);
+
+        CorrectTimeRecordRequest request =
+                new CorrectTimeRecordRequest(
+                        newWorkDate,
+                        newRecordedAt,
+                        "Correção administrativa."
+                );
+
+        when(userRepository.findByEmail(adminEmail))
+                .thenReturn(Optional.of(admin));
+
+        when(timeRecordRepository.findById(timeRecord.getId()))
+                .thenReturn(Optional.of(timeRecord));
+
+        when(timeRecordRepository
+                .existsByUserIdAndWorkDateAndRecordTypeAndIdNot(
+                        analyst.getId(),
+                        newWorkDate,
+                        TimeRecordType.CLOCK_IN,
+                        timeRecord.getId()
+                )).thenReturn(true);
+
+        DuplicateTimeRecordException exception = assertThrows(
+                DuplicateTimeRecordException.class,
+                () -> timeRecordService.correct(
+                        adminEmail,
+                        timeRecord.getId(),
+                        request
+                )
+        );
+
+        assertEquals(
+                "Já existe outra marcação deste tipo para o analista na jornada informada.",
+                exception.getMessage()
+        );
+
+        verify(timeRecordRepository, never())
+                .save(any(TimeRecord.class));
+
+        verifyNoInteractions(
+                timeRecordCorrectionRepository,
+                timeRecordMapper
+        );
+    }
+
+    @Test
+    void shouldRejectCorrectionWhenAuthenticatedUserIsNotFound() {
+        String adminEmail = "admin@fwnet.com.br";
+
+        CorrectTimeRecordRequest request =
+                new CorrectTimeRecordRequest(
+                        LocalDate.now(),
+                        OffsetDateTime.now(),
+                        "Correção administrativa."
+                );
+
+        when(userRepository.findByEmail(adminEmail))
+                .thenReturn(Optional.empty());
+
+        UserNotFoundException exception = assertThrows(
+                UserNotFoundException.class,
+                () -> timeRecordService.correct(
+                        adminEmail,
+                        UUID.randomUUID(),
+                        request
+                )
+        );
+
+        assertEquals(
+                "Usuário autenticado não encontrado.",
+                exception.getMessage()
+        );
+
+        verifyNoInteractions(
+                timeRecordRepository,
+                timeRecordCorrectionRepository,
+                timeRecordMapper
+        );
+    }
     private User createActiveUser() {
         return createUser(
                 "Analyst Test",

@@ -1,16 +1,20 @@
 package br.com.fwnet.timetracking.service;
 
+import br.com.fwnet.timetracking.dto.request.CorrectTimeRecordRequest;
 import br.com.fwnet.timetracking.dto.request.CreateTimeRecordRequest;
 import br.com.fwnet.timetracking.dto.response.AdminTimeRecordResponse;
 import br.com.fwnet.timetracking.dto.response.TimeRecordResponse;
 import br.com.fwnet.timetracking.entity.TimeRecord;
+import br.com.fwnet.timetracking.entity.TimeRecordCorrection;
 import br.com.fwnet.timetracking.entity.User;
 import br.com.fwnet.timetracking.enums.TimeRecordType;
 import br.com.fwnet.timetracking.exception.DuplicateTimeRecordException;
 import br.com.fwnet.timetracking.exception.InactiveUserException;
 import br.com.fwnet.timetracking.exception.InvalidTimeRecordSequenceException;
+import br.com.fwnet.timetracking.exception.TimeRecordNotFoundException;
 import br.com.fwnet.timetracking.exception.UserNotFoundException;
 import br.com.fwnet.timetracking.mapper.TimeRecordMapper;
+import br.com.fwnet.timetracking.repository.TimeRecordCorrectionRepository;
 import br.com.fwnet.timetracking.repository.TimeRecordRepository;
 import br.com.fwnet.timetracking.repository.UserRepository;
 import org.springframework.stereotype.Service;
@@ -27,15 +31,18 @@ public class TimeRecordService {
     private static final String WEB_SOURCE = "WEB";
 
     private final TimeRecordRepository timeRecordRepository;
+    private final TimeRecordCorrectionRepository timeRecordCorrectionRepository;
     private final UserRepository userRepository;
     private final TimeRecordMapper timeRecordMapper;
 
     public TimeRecordService(
             TimeRecordRepository timeRecordRepository,
+            TimeRecordCorrectionRepository timeRecordCorrectionRepository,
             UserRepository userRepository,
             TimeRecordMapper timeRecordMapper
     ) {
         this.timeRecordRepository = timeRecordRepository;
+        this.timeRecordCorrectionRepository = timeRecordCorrectionRepository;
         this.userRepository = userRepository;
         this.timeRecordMapper = timeRecordMapper;
     }
@@ -120,6 +127,73 @@ public class TimeRecordService {
                 .stream()
                 .map(timeRecordMapper::toAdminResponse)
                 .toList();
+    }
+
+    @Transactional
+    public AdminTimeRecordResponse correct(
+            String authenticatedEmail,
+            UUID timeRecordId,
+            CorrectTimeRecordRequest request
+    ) {
+        User correctedByUser = userRepository
+                .findByEmail(authenticatedEmail)
+                .orElseThrow(() ->
+                        new UserNotFoundException(
+                                "Usuário autenticado não encontrado."
+                        )
+                );
+
+        TimeRecord timeRecord = timeRecordRepository
+                .findById(timeRecordId)
+                .orElseThrow(() ->
+                        new TimeRecordNotFoundException(
+                                "Marcação de ponto não encontrada."
+                        )
+                );
+
+        boolean duplicateExists =
+                timeRecordRepository
+                        .existsByUserIdAndWorkDateAndRecordTypeAndIdNot(
+                                timeRecord.getUser().getId(),
+                                request.workDate(),
+                                timeRecord.getRecordType(),
+                                timeRecord.getId()
+                        );
+
+        if (duplicateExists) {
+            throw new DuplicateTimeRecordException(
+                    "Já existe outra marcação deste tipo para o analista na jornada informada."
+            );
+        }
+
+        LocalDate previousWorkDate =
+                timeRecord.getWorkDate();
+
+        OffsetDateTime previousRecordedAt =
+                timeRecord.getRecordedAt();
+
+        timeRecord.setWorkDate(request.workDate());
+        timeRecord.setRecordedAt(request.recordedAt());
+
+        TimeRecord savedTimeRecord =
+                timeRecordRepository.save(timeRecord);
+
+        TimeRecordCorrection correction =
+                new TimeRecordCorrection();
+
+        correction.setId(UUID.randomUUID());
+        correction.setTimeRecord(savedTimeRecord);
+        correction.setCorrectedByUser(correctedByUser);
+        correction.setReason(request.reason().trim());
+        correction.setPreviousWorkDate(previousWorkDate);
+        correction.setNewWorkDate(savedTimeRecord.getWorkDate());
+        correction.setPreviousRecordedAt(previousRecordedAt);
+        correction.setNewRecordedAt(savedTimeRecord.getRecordedAt());
+        correction.setCreatedAt(OffsetDateTime.now());
+
+        timeRecordCorrectionRepository.save(correction);
+
+        return timeRecordMapper.toAdminResponse(savedTimeRecord);
     }
 
     private void validateSequence(
