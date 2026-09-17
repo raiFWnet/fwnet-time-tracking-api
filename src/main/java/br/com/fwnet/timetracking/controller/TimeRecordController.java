@@ -2,6 +2,7 @@ package br.com.fwnet.timetracking.controller;
 
 import br.com.fwnet.timetracking.dto.request.CorrectTimeRecordRequest;
 import br.com.fwnet.timetracking.dto.request.CreateTimeRecordRequest;
+import br.com.fwnet.timetracking.dto.response.AdminTimeRecordCorrectionResponse;
 import br.com.fwnet.timetracking.dto.response.AdminTimeRecordResponse;
 import br.com.fwnet.timetracking.dto.response.TimeRecordResponse;
 import br.com.fwnet.timetracking.service.TimeRecordService;
@@ -64,6 +65,15 @@ public class TimeRecordController {
     public ResponseEntity<List<AdminTimeRecordResponse>> getAdminHistory() {
         List<AdminTimeRecordResponse> response =
                 timeRecordService.getAdminHistory();
+
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/admin/corrections")
+    public ResponseEntity<List<AdminTimeRecordCorrectionResponse>>
+    getAdminCorrectionLogs() {
+        List<AdminTimeRecordCorrectionResponse> response =
+                timeRecordService.getAdminCorrectionLogs();
 
         return ResponseEntity.ok(response);
     }
