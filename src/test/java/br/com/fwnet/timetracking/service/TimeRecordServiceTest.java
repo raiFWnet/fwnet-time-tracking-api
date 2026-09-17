@@ -2,6 +2,7 @@ package br.com.fwnet.timetracking.service;
 
 import br.com.fwnet.timetracking.dto.request.CorrectTimeRecordRequest;
 import br.com.fwnet.timetracking.dto.request.CreateTimeRecordRequest;
+import br.com.fwnet.timetracking.dto.response.AdminTimeRecordCorrectionResponse;
 import br.com.fwnet.timetracking.dto.response.AdminTimeRecordResponse;
 import br.com.fwnet.timetracking.dto.response.TimeRecordResponse;
 import br.com.fwnet.timetracking.entity.TimeRecord;
@@ -13,6 +14,7 @@ import br.com.fwnet.timetracking.exception.InactiveUserException;
 import br.com.fwnet.timetracking.exception.InvalidTimeRecordSequenceException;
 import br.com.fwnet.timetracking.exception.TimeRecordNotFoundException;
 import br.com.fwnet.timetracking.exception.UserNotFoundException;
+import br.com.fwnet.timetracking.mapper.TimeRecordCorrectionMapper;
 import br.com.fwnet.timetracking.mapper.TimeRecordMapper;
 import br.com.fwnet.timetracking.repository.TimeRecordCorrectionRepository;
 import br.com.fwnet.timetracking.repository.TimeRecordRepository;
@@ -56,6 +58,8 @@ class TimeRecordServiceTest {
 
     @Mock
     private TimeRecordMapper timeRecordMapper;
+    @Mock
+    private TimeRecordCorrectionMapper timeRecordCorrectionMapper;
 
     private TimeRecordService timeRecordService;
 
@@ -65,7 +69,8 @@ class TimeRecordServiceTest {
                 timeRecordRepository,
                 timeRecordCorrectionRepository,
                 userRepository,
-                timeRecordMapper
+                timeRecordMapper,
+                timeRecordCorrectionMapper
         );
     }
     @Test
@@ -598,6 +603,48 @@ class TimeRecordServiceTest {
 
         verify(timeRecordMapper)
                 .toAdminResponse(secondRecord);
+    }
+    @Test
+    void shouldReturnAllCorrectionLogsForAdmin() {
+        TimeRecordCorrection correction =
+                new TimeRecordCorrection();
+
+        AdminTimeRecordCorrectionResponse expectedResponse =
+                new AdminTimeRecordCorrectionResponse(
+                        UUID.randomUUID(),
+                        UUID.randomUUID(),
+                        UUID.randomUUID(),
+                        "Analyst Test",
+                        EMAIL,
+                        TimeRecordType.CLOCK_IN,
+                        LocalDate.now(),
+                        LocalDate.now(),
+                        OffsetDateTime.now(),
+                        OffsetDateTime.now(),
+                        UUID.randomUUID(),
+                        "Admin Test",
+                        "admin@fwnet.com.br",
+                        "Correção administrativa.",
+                        OffsetDateTime.now()
+                );
+
+        when(timeRecordCorrectionRepository.findAllByOrderByCreatedAtDesc())
+                .thenReturn(List.of(correction));
+
+        when(timeRecordCorrectionMapper.toAdminResponse(correction))
+                .thenReturn(expectedResponse);
+
+        List<AdminTimeRecordCorrectionResponse> logs =
+                timeRecordService.getAdminCorrectionLogs();
+
+        assertEquals(1, logs.size());
+        assertEquals(expectedResponse, logs.get(0));
+
+        verify(timeRecordCorrectionRepository)
+                .findAllByOrderByCreatedAtDesc();
+
+        verify(timeRecordCorrectionMapper)
+                .toAdminResponse(correction);
     }
     @Test
     void shouldCorrectTimeRecordAndCreateAudit() {

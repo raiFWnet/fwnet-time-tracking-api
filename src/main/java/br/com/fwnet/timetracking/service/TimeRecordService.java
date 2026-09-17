@@ -2,6 +2,7 @@ package br.com.fwnet.timetracking.service;
 
 import br.com.fwnet.timetracking.dto.request.CorrectTimeRecordRequest;
 import br.com.fwnet.timetracking.dto.request.CreateTimeRecordRequest;
+import br.com.fwnet.timetracking.dto.response.AdminTimeRecordCorrectionResponse;
 import br.com.fwnet.timetracking.dto.response.AdminTimeRecordResponse;
 import br.com.fwnet.timetracking.dto.response.TimeRecordResponse;
 import br.com.fwnet.timetracking.entity.TimeRecord;
@@ -13,6 +14,7 @@ import br.com.fwnet.timetracking.exception.InactiveUserException;
 import br.com.fwnet.timetracking.exception.InvalidTimeRecordSequenceException;
 import br.com.fwnet.timetracking.exception.TimeRecordNotFoundException;
 import br.com.fwnet.timetracking.exception.UserNotFoundException;
+import br.com.fwnet.timetracking.mapper.TimeRecordCorrectionMapper;
 import br.com.fwnet.timetracking.mapper.TimeRecordMapper;
 import br.com.fwnet.timetracking.repository.TimeRecordCorrectionRepository;
 import br.com.fwnet.timetracking.repository.TimeRecordRepository;
@@ -34,17 +36,20 @@ public class TimeRecordService {
     private final TimeRecordCorrectionRepository timeRecordCorrectionRepository;
     private final UserRepository userRepository;
     private final TimeRecordMapper timeRecordMapper;
+    private final TimeRecordCorrectionMapper timeRecordCorrectionMapper;
 
     public TimeRecordService(
             TimeRecordRepository timeRecordRepository,
             TimeRecordCorrectionRepository timeRecordCorrectionRepository,
             UserRepository userRepository,
-            TimeRecordMapper timeRecordMapper
+            TimeRecordMapper timeRecordMapper,
+            TimeRecordCorrectionMapper timeRecordCorrectionMapper
     ) {
         this.timeRecordRepository = timeRecordRepository;
         this.timeRecordCorrectionRepository = timeRecordCorrectionRepository;
         this.userRepository = userRepository;
         this.timeRecordMapper = timeRecordMapper;
+        this.timeRecordCorrectionMapper = timeRecordCorrectionMapper;
     }
 
     @Transactional
@@ -126,6 +131,15 @@ public class TimeRecordService {
                 .findAllByOrderByRecordedAtDesc()
                 .stream()
                 .map(timeRecordMapper::toAdminResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<AdminTimeRecordCorrectionResponse> getAdminCorrectionLogs() {
+        return timeRecordCorrectionRepository
+                .findAllByOrderByCreatedAtDesc()
+                .stream()
+                .map(timeRecordCorrectionMapper::toAdminResponse)
                 .toList();
     }
 
