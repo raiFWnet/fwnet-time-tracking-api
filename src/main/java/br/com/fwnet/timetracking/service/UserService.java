@@ -89,4 +89,28 @@ public class UserService {
 
         return userMapper.toResponse(savedUser);
     }
+
+    @Transactional
+    public UserResponse deactivate(UUID id) {
+        return updateActiveStatus(id, false);
+    }
+
+    @Transactional
+    public UserResponse reactivate(UUID id) {
+        return updateActiveStatus(id, true);
+    }
+
+    private UserResponse updateActiveStatus(UUID id, boolean active) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() ->
+                        new UserNotFoundException("Usuário não encontrado.")
+                );
+
+        user.setActive(active);
+        user.setUpdatedAt(OffsetDateTime.now());
+
+        User savedUser = userRepository.save(user);
+
+        return userMapper.toResponse(savedUser);
+    }
 }
