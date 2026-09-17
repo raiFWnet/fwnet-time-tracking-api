@@ -164,6 +164,7 @@ class UserServiceTest {
         verify(userRepository, never()).save(any(User.class));
         verifyNoInteractions(passwordEncoder);
     }
+
     @Test
     void shouldListAllUsers() {
         when(userRepository.findAll()).thenReturn(List.of(user));
@@ -179,6 +180,57 @@ class UserServiceTest {
 
         verify(userRepository).findAll();
     }
+
+    @Test
+    void shouldDeactivateUser() {
+        user.setActive(true);
+
+        OffsetDateTime previousUpdatedAt = user.getUpdatedAt();
+
+        when(userRepository.findById(user.getId()))
+                .thenReturn(Optional.of(user));
+        when(userRepository.save(user)).thenReturn(user);
+
+        UserResponse response = userService.deactivate(user.getId());
+
+        assertFalse(response.active());
+        assertTrue(response.updatedAt().isAfter(previousUpdatedAt));
+
+        verify(userRepository).findById(user.getId());
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void shouldReactivateUser() {
+        OffsetDateTime previousUpdatedAt = user.getUpdatedAt();
+
+        when(userRepository.findById(user.getId()))
+                .thenReturn(Optional.of(user));
+        when(userRepository.save(user)).thenReturn(user);
+
+        UserResponse response = userService.reactivate(user.getId());
+
+        assertTrue(response.active());
+        assertTrue(response.updatedAt().isAfter(previousUpdatedAt));
+
+        verify(userRepository).findById(user.getId());
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void shouldRejectStatusUpdateWhenUserDoesNotExist() {
+        UUID id = UUID.randomUUID();
+
+        when(userRepository.findById(id)).thenReturn(Optional.empty());
+
+        assertThrows(
+                UserNotFoundException.class,
+                () -> userService.deactivate(id)
+        );
+
+        verify(userRepository, never()).save(any(User.class));
+    }
+
     private void assertPasswordIsPreserved(String password) {
         UpdateUserRequest request = new UpdateUserRequest(
                 "Nome Atualizado",
