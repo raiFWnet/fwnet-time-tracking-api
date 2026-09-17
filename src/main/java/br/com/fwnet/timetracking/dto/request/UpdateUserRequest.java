@@ -1,0 +1,23 @@
+package br.com.fwnet.timetracking.dto.request;
+
+import br.com.fwnet.timetracking.enums.Role;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
+public record UpdateUserRequest(
+
+        @NotBlank
+        String fullName,
+
+        @NotBlank
+        @Email
+        String email,
+
+        String password,
+
+        @NotNull
+        Role role
+
+) {
+}

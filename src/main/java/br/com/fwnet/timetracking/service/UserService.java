@@ -1,9 +1,11 @@
 package br.com.fwnet.timetracking.service;
 
 import br.com.fwnet.timetracking.dto.request.CreateUserRequest;
+import br.com.fwnet.timetracking.dto.request.UpdateUserRequest;
 import br.com.fwnet.timetracking.dto.response.UserResponse;
 import br.com.fwnet.timetracking.entity.User;
 import br.com.fwnet.timetracking.exception.EmailAlreadyRegisteredException;
+import br.com.fwnet.timetracking.exception.UserNotFoundException;
 import br.com.fwnet.timetracking.mapper.UserMapper;
 import br.com.fwnet.timetracking.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -47,6 +49,32 @@ public class UserService {
         user.setActive(true);
         user.setCreatedAt(now);
         user.setUpdatedAt(now);
+
+        User savedUser = userRepository.save(user);
+
+        return userMapper.toResponse(savedUser);
+    }
+
+    @Transactional
+    public UserResponse update(UUID id, UpdateUserRequest request) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() ->
+                        new UserNotFoundException("Usuário não encontrado.")
+                );
+
+        if (userRepository.existsByEmailAndIdNot(request.email(), id)) {
+            throw new EmailAlreadyRegisteredException(request.email());
+        }
+
+        user.setFullName(request.fullName());
+        user.setEmail(request.email());
+        user.setRole(request.role());
+
+        if (request.password() != null && !request.password().isBlank()) {
+            user.setPasswordHash(passwordEncoder.encode(request.password()));
+        }
+
+        user.setUpdatedAt(OffsetDateTime.now());
 
         User savedUser = userRepository.save(user);
 
