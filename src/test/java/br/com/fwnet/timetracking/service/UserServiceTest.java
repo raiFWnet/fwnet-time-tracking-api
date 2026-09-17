@@ -16,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -163,7 +164,21 @@ class UserServiceTest {
         verify(userRepository, never()).save(any(User.class));
         verifyNoInteractions(passwordEncoder);
     }
+    @Test
+    void shouldListAllUsers() {
+        when(userRepository.findAll()).thenReturn(List.of(user));
 
+        List<UserResponse> response = userService.findAll();
+
+        assertEquals(1, response.size());
+        assertEquals(user.getId(), response.getFirst().id());
+        assertEquals(user.getFullName(), response.getFirst().fullName());
+        assertEquals(user.getEmail(), response.getFirst().email());
+        assertEquals(user.getRole(), response.getFirst().role());
+        assertEquals(user.isActive(), response.getFirst().active());
+
+        verify(userRepository).findAll();
+    }
     private void assertPasswordIsPreserved(String password) {
         UpdateUserRequest request = new UpdateUserRequest(
                 "Nome Atualizado",
