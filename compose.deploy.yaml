@@ -1,0 +1,47 @@
+services:
+  db:
+    image: postgres:17
+    container_name: fwnet-time-tracking-db
+    environment:
+      POSTGRES_DB: fwnet_time_tracking
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - fwnet_time_tracking_db_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d fwnet_time_tracking"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    image: ghcr.io/raifwnet/fwnet-time-tracking-api:develop
+    container_name: fwnet-time-tracking-api
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/fwnet_time_tracking
+      DB_USERNAME: postgres
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      BOOTSTRAP_ADMIN_ENABLED: ${BOOTSTRAP_ADMIN_ENABLED:-true}
+      BOOTSTRAP_ADMIN_FULL_NAME: ${BOOTSTRAP_ADMIN_FULL_NAME:-Administrador FWnet}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD}
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    image: ghcr.io/raifwnet/fwnet-time-tracking-web:develop
+    container_name: fwnet-time-tracking-web
+    ports:
+      - "4200:80"
+    depends_on:
+      - api
+
+volumes:
+  fwnet_time_tracking_db_data:
